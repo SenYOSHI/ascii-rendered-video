@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include "bmpstruct.h"
 
-double grayscale(RGBTRIPLE pixel);
-int interpolate(double p00, double p01, double p10, double p11, int dx, int dy);
-    
-#define theight 600
+float grayscale(RGBTRIPLE pixel);
+
+// coefficient of height and width for each character cell
+#define cellheight 20
+#define cellwidth 10
 
 int main(int argc, char *argv[])
 {
@@ -52,27 +52,35 @@ int main(int argc, char *argv[])
     int padding = (4 - (width * sizeof(RGBTRIPLE)) % 4) % 4;
     for (int i = 0; i < height; i++)
     {
-        fread(image[i], sizeof(RGBTRIPLE), width, infile);
+        fread(image[height - i - 1], sizeof(RGBTRIPLE), width, infile);
         fseek(infile, padding, SEEK_CUR);
     }
-    float aspratio = width / height;
-    int twidth = floor(theight * aspratio);
-    float ratioheight = height / theight;
-    float ratiowidth = width / twidth;
+    int twidth = width / cellwidth;
+    int theight = height / cellheight;
     char map[14] = {'.', ',', ':', ';', '-', '=', '+', 'x', 'X', '8', '0', 'S','#','@'};
-    // moved writing into the file and writing the row into the same loop as calculations : 24 ms -> 18 ms
+    // 1) moved writing into the file and writing the row into the same loop as calculations : 24 ms -> 18 ms
     for (int i = 0; i < theight; i++)
     {
-        float src_x = i / ratioheight; // 18 ms -> 17 ms
+        int x0 = i * height / theight;
+        int x1 = (i + 1) * height / theight;
         char row[twidth + 2];
+        // changed from bilinear to box averaging -> 18 ms -> 11 ms and produces a better ascii image
         for (int j = 0; j < twidth; j++)
         {
-            // replace bilinear with nearest neighbor interpolation : 17 ms -> 11 ms
-            float src_y = j / ratiowidth;
-            int x = (int)(src_x + 0.5f);
-            int y = (int)(src_y + 0.5f);
-            int pixel = grayscale(image[x][y]);
-            row[j] = map[(pixel * 13 + 127) / 255];
+            int y0 = j * width / twidth;
+            int y1 = (j + 1) * width / twidth;
+            long sum = 0;
+            int count = 0;
+            for (int k = x0; k < x1; k++)
+            {
+                for (int l = y0; l < y1; l++)
+                {
+                    sum += grayscale(image[k][l]);
+                    count++;
+                }
+            }
+            sum = sum / count;
+            row[j] = map[(sum * 13 + 127) / 255];
         }
         row[twidth] = '\n';
         row[twidth + 1] = '\0';
@@ -84,13 +92,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-double grayscale(RGBTRIPLE pixel)
+float grayscale(RGBTRIPLE pixel)
 {
     return (pixel.rgbtRed + pixel.rgbtGreen + pixel.rgbtBlue) / 3.0; 
-}
-
-int interpolate(double p00, double p01, double p10, double p11, int dx, int dy)
-{
-    // simplified bi-interpolation equation
-    return round(p00 * (1 - dx) * (1 - dy) + p10 * dx * (1 - dy) + p01 * (1 - dx) * dy + p11 * dx * dy);
 }
