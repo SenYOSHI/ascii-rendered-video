@@ -5,7 +5,7 @@
 
 double grayscale(RGBTRIPLE pixel);
 int interpolate(double p00, double p01, double p10, double p11, int dx, int dy);
-
+    
 #define theight 600
 
 int main(int argc, char *argv[])

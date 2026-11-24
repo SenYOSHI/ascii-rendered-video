@@ -10,4 +10,4 @@ demux : demux_decode.c
 ascii : ascii.c bmpstruct.h
 	$(CC) -o ascii.exe ascii.c
 clean :
-	del /Q *.exe 2>NUL
+	del /Q *.exe 2>NUL  
