@@ -1,3 +1,5 @@
-.vscode/
-decoding_video.c
-test.mp4
+*
+
+!main.c
+!makefile
+!decoder.exe

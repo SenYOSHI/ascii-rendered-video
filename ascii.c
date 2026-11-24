@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <time.h>
 #include "bmpstruct.h"
 
 double grayscale(RGBTRIPLE pixel);
 int interpolate(double p00, double p01, double p10, double p11, int dx, int dy);
-char get_character(char map[], int pixel);
+
+#define theight 600
 
 int main(int argc, char *argv[])
 {
@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
     }
     BITMAPFILEHEADER fileheader;
     BITMAPINFOHEADER fileinfoheader;
-    fread(&fileheader, 14, 1, infile);
+    fread(&fileheader, sizeof(BITMAPFILEHEADER), 1, infile);
     fread(&fileinfoheader, sizeof(BITMAPINFOHEADER), 1, infile);
     if (fileheader.bfType != 0x4D42 || fileheader.bfOffset != 54 ||fileinfoheader.biSize != 40 
         || fileinfoheader.biCompression != 0 || fileinfoheader.biBitCount != 24)
@@ -56,44 +56,30 @@ int main(int argc, char *argv[])
         fseek(infile, padding, SEEK_CUR);
     }
     float aspratio = width / height;
-    int theight = 600;
     int twidth = floor(theight * aspratio);
     float ratioheight = height / theight;
     float ratiowidth = width / twidth;
-    int (*text)[twidth] = calloc(theight, twidth * sizeof(int));
+    char map[14] = {'.', ',', ':', ';', '-', '=', '+', 'x', 'X', '8', '0', 'S','#','@'};
+    // moved writing into the file and writing the row into the same loop as calculations : 24 ms -> 18 ms
     for (int i = 0; i < theight; i++)
     {
+        float src_x = i / ratioheight; // 18 ms -> 17 ms
+        char row[twidth + 2];
         for (int j = 0; j < twidth; j++)
         {
-            float src_x = i / ratioheight;
+            // replace bilinear with nearest neighbor interpolation : 17 ms -> 11 ms
             float src_y = j / ratiowidth;
-            int x0 = floor(src_x);
-            int y0 = floor(src_y);
-            int x1 = x0 + 1;
-            int y1 = y0 + 1;
-            int dx = src_x - x0;
-            int dy = src_y - y0;
-            double p00 = grayscale(image[x0][y0]);
-            double p01 = grayscale(image[x0][y1]);
-            double p10 = grayscale(image[x1][y0]);
-            double p11 = grayscale(image[x1][y1]);
-            text[i][j] = interpolate(p00, p01, p10, p11, dx, dy);
+            int x = (int)(src_x + 0.5f);
+            int y = (int)(src_y + 0.5f);
+            int pixel = grayscale(image[x][y]);
+            row[j] = map[(pixel * 13 + 127) / 255];
         }
+        row[twidth] = '\n';
+        row[twidth + 1] = '\0';
+        fputs(row, outfile);
     }
     free(image);
     fclose(infile);
-    char map[14] = {'.', ',', ':', ';', '-', '=', '+', 'x', 'X', '8', '0', 'S','#','@'};
-    char character;
-    for (int i = 0; i < theight; i++)
-    {
-        for (int j = 0; j < twidth; j++)
-        {
-            character = get_character(map, text[i][j]);
-            fprintf(outfile, "%c",character);
-        }
-        fprintf(outfile, "%c", '\n');
-    }
-    free(text);
     fclose(outfile);
     return 0;
 }
@@ -105,10 +91,6 @@ double grayscale(RGBTRIPLE pixel)
 
 int interpolate(double p00, double p01, double p10, double p11, int dx, int dy)
 {
+    // simplified bi-interpolation equation
     return round(p00 * (1 - dx) * (1 - dy) + p10 * dx * (1 - dy) + p01 * (1 - dx) * dy + p11 * dx * dy);
-}
-
-char get_character(char map[], int pixel)
-{
-    return map[(pixel * 13 + 127) / 255];
 }
