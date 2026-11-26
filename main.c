@@ -15,6 +15,9 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 
+#define cellheight 20
+#define cellwidth 10
+
 AVFormatContext *fmt_ctx = NULL;
 AVCodecContext *video_dec_ctx = NULL;
 const AVCodec *dec = NULL;
@@ -82,15 +85,55 @@ int main(int argc, char **argv)
     }
     printf("pkt -> stream_index = %d\n", pkt -> stream_index);
     printf("video_stream_idx = %d\n", video_stream_idx);
+    int c = 0;
+    int twidth = width / cellwidth;
+    int theight = height / cellheight;
+    char map[14] = {'.', ',', ':', ';', '-', '=', '+', 'x', 'X', '8', '0', 'S', '#', '@'};
     while (res = av_read_frame(fmt_ctx, pkt) >= 0)
     {
         if (pkt -> stream_index == video_stream_idx)
         {
             avcodec_send_packet(video_dec_ctx, pkt);
-            if (avcodec_receive_frame(video_dec_ctx, frame) == 0)
+            // ascii rendering inside this if statement
+            if (avcodec_receive_frame(video_dec_ctx, frame) >= 0)
             {
-                printf("width = %d\n height = %d\n pixel format = %s\n", 
-                    frame -> height, frame -> width, av_get_pix_fmt_name(frame -> format));
+                int linesize = frame -> linesize[0];
+                // brightness values of a frame (per pixel)
+                for (int i = 0; i < theight; i++)
+                {
+                    int x0 = i * height / theight;
+                    int x1 = (i + 1) * height / theight;
+                    char row[twidth + 2];
+                    for (int j = 0; j < twidth; j++)
+                    {
+                        int y0 = j  * width / twidth;
+                        int y1 = (j + 1) * width / twidth;
+                        long sum = 0;
+                        int count = 0;
+                        //printf("makes it here\n");
+                        for (int x = x0; x < x1; x++)
+                        {
+                            for (int y = y0; y < y1; y++)
+                            {
+                                if (x >= height || y >= width)
+                                {
+                                    printf("frame bounds disrespected\n");
+                                    printf("x = %d, y = %d\n", x, y);
+                                    exit(1);
+                                }
+                                sum += frame -> data[0][x * linesize + y];
+                                count++;
+                            }
+                        }
+                        //printf("count = %d\n", count);
+                        sum = sum / count;
+                        row[j] = map[(sum * 13 + 127) / 255];
+                    }
+                    row[twidth] = '\n';
+                    row[twidth + 1] = '\0';
+                    printf("%s\n", row);
+                    fputs(row, stdout);
+                }
                 break;
             }
         }
