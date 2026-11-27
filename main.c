@@ -5,6 +5,7 @@
     https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html
     https://dranger.com/ffmpeg/tutorial01.html
     demux_decode.c
+    default terminal font size is 12
  */
 
 #include <stdio.h>
@@ -15,8 +16,9 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 
-#define cellheight 20
-#define cellwidth 10
+#define cellheight 20 // 12 ?
+#define cellwidth 10 // 12 ?
+// #define cellfont 12
 
 AVFormatContext *fmt_ctx = NULL;
 AVCodecContext *video_dec_ctx = NULL;
